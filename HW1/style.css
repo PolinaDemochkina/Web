@@ -1,0 +1,104 @@
+html * {
+    line-height: 1.15;
+    font-family: "Times New Roman", sans-serif;
+}
+
+body {
+    margin: 50px auto;
+    max-width: 767px;
+    text-align: center;
+    font-size: 10pt;
+}
+
+H1 {
+    text-align: center;
+    font-size: 24pt;
+}
+
+H4 {
+    margin-bottom: 4pt;
+}
+
+H5 {
+    text-align: left;
+    font-style: italic;
+    font-size: 10pt;
+    margin-bottom: 5pt;
+}
+
+H6 {
+    text-align: left;
+    font-size: 8pt;
+}
+
+p {
+    text-indent: 19px;
+    text-align: justify;
+    margin-bottom: 6pt;
+}
+
+table{
+    margin: 10px auto;
+    border:1px solid #000000;
+    border-collapse: collapse;
+    font-size: 8pt;
+}
+
+table td{
+    border:1px solid #000000;
+    padding: 5px 2px 5px 2px;
+    width: fit-content;
+}
+
+table th{
+    border:1px solid #000000;
+    padding:5px;
+}
+
+ol {
+    counter-reset: list;
+    list-style-position: outside;
+    list-style-type: symbols("[1]");
+}
+
+ol > li {
+    text-align: justify;
+}
+
+ul li {
+    list-style-type: none;
+    margin-bottom: 10pt;
+}
+
+ul li::before {
+    content: '○';
+    color:red;
+}
+
+.columns {
+    column-count: 2;
+    column-gap: 25px;
+    float: left;
+    padding-top: 25px;
+    padding-bottom: 25px;
+}
+
+.column {
+    float: left;
+    width: 50%;
+}
+
+.row:after {
+    display: table;
+    clear: both;
+}
+
+.footer {
+    padding-bottom: 100px;
+}
+
+.frame {
+    padding: 10px;
+    background: #ffffff;
+    border: 2px solid #90e4a9;
+}

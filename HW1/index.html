@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link href="style.css" rel="stylesheet" type="text/css"/>
+    <meta charset="UTF-8">
+    <title>Neural network model for video-based facial expression recognition in-the-wild on mobile devices</title>
+</head>
+<body>
+<!--Page 1-->
+<H1>Neural network model for video-based facial expression recognition in-the-wild on mobile devices</H1>
+<div class="row" style="text-align: center;">
+    <div class="column">
+        Polina Demochkina<br>
+        <i>HSE University</i><br>
+        Nizhny Novgorod, Russia<br>
+        pvdemochkina@edu.hse.ru<br>
+    </div>
+    <div class="column">
+        Andrey V. Savchenko<sup>[0000-0001-6196-0564]</sup><br>
+        <i>Laboratory of Algorithms and Technologies for Network Analysis<br>
+            HSE University</i><br>
+        Nizhny Novgorod, Russia<br>
+        avsavchenko@hse.ru<br>
+    </div>
+</div>
+<div class="columns">
+    <p>
+        <strong>
+            <i>Abstract</i>— In this paper, we propose to solve the problem of facial expression recognition in
+            videos by implementing a two-stage procedure, in which, firstly, facial features are extracted from all
+            frames using an EfficientNet-based model. The latter is pre-trained to identify facial attributes and
+            further fine-tuned on an external dataset for the emotion classification task. Secondly, multiple
+            statistical functions are calculated and used in the aggregation process to create a single video
+            representation. Furthermore, we propose a new technique for sequence, frame-level attention models, and
+            1D convolutions by concatenating the output of a statistical function with the facial features. It was
+            experimentally shown that the proposed approach leads to state-of-the-art results on the AFEW 8.0 dataset.
+        </strong>
+    </p>
+    <p>
+        <strong>
+            <i>
+                Keywords—emotion recognition, facial analysis, facial expression recognition, deep features,
+                convolutional neural networks (CNN), frame attention network, mobile device, AFEW (Acted Faces in the Wild)
+            </i>
+        </strong>
+    </p>
+    <H4>I.	INTRODUCTION</H4>
+    <p>
+        There has been a rise in interest in facial expression recognition due to a wide range of applications in
+        the field of human-computer interaction. With the extensive use of smartphones in the modern world, it is
+        important to develop solutions that can be implemented on mobile devices in real-time systems <a href="#1">[1]</a>, <a href="#2">[2]</a>.
+        Considering the limited memory and computational power of mobile devices, it becomes clear that there is a
+        need to develop lightweight models, which can be used to effectively solve the video-based emotion
+        classification task.
+    </p>
+    <p>
+        Existing approaches, such as supervised scoring ensemble (SSE) <a href="#3">[3]</a>, convolutional neural network ensembles
+        <a href="#4">[4]</a>, convolutional three-dimensional network (C3D) <a href="#5">[5]</a>, are currently the most accurate methods for the
+        Acted Facial Expressions in the Wild (AFEW) dataset <a href="#6">[6]</a> from the Audio-Video emotion recognition
+        sub-challenge from the EmotiW (Emotion Recognition in the Wild) 2019 <a href="#7">[7]</a>. However, most of the above-
+        mentioned techniques are not suitable for mobile applications due to their high computational complexity.
+    </p>
+    <p>
+        Thus, in this paper, we examine the lightweight architectures of convolutional neural networks (CNNs) <a href="#8">[8]</a>
+        for video-based facial expression recognition <a href="#9">[9]</a>, namely, different variations of our lightweight approach
+        (MobileEmotiFace) <a href="#10">[10]</a>, including multiple aggregation techniques, classifiers, and feature extractors. Our
+        main contribution consists of, firstly, a new feature extractor based on the EfficientNet architecture <a href="#11">[11]</a>,
+        which was trained using the technique described in this paper <a href="#9">[9]</a>. It was experimentally shown that using
+        this feature extractor in combination with the MobileEmotiFace approach leads to state-of-the-art results
+        for the AFEW 8.0 dataset. Secondly, inspired by the attention mechanism <a href="#12">[12]</a>, which has been successfully
+        applied to many machine learning tasks <a href="#13">[13]</a>, and the Frame Attention Networks (FAN) <a href="#14">[14]</a>, we experiment with
+        a new approach, which consists of using features extracted by our EfficientNet model in sequential models,
+        including FAN <a href="#14">[14]</a>. We propose a new way of creating a training set for attention-based models by feeding
+        some statistic (mean or max) of the frames to the network in addition to the frames themselves. This
+        approach proves to be better than the traditional technique by 6.08%.
+    </p>
+    <H4>II.	PROPOSED APPROACH</H4>
+    <H5>A.	MobileEmotiFace</H5>
+    <p>
+        For the video-based facial expression recognition task, it is necessary to classify a given input
+        sequence of video frames into one of the seven emotion classes (Anger, Disgust, Fear, Happiness,
+        Neutral, Sadness, and Surprise). The general pipeline is presented in Fig. 1.
+    </p>
+    <div style="page-break-inside: avoid;">
+        <img src="pipeline1.jpg" alt="Pipeline 1" style="width: 338px; height: auto;"/>
+        <H6>Fig. 1.	MobileEmotiFace pipeline</H6>
+    </div>
+</div>
+<div class="footer" style="page-break-after: always;">XXX-X-XXXX-XXXX-X/XX/$XX.00 ©20XX IEEE</div>
+<!--Page 2-->
+<div class="columns" style="page-break-before: always;">
+    <p>
+        The first step focuses on extracting the facial regions from each frame of a given video. Our previous
+        experiments showed that using the MTCNN detector <a href="#15">[15]</a> instead of the facial detector from Dlib leads to more
+        accurate results <a href="#10">[10]</a>, which is why we choose to use the former. In the case when more than one face is detected
+        in a frame, we select the face with the maximal detection score. Images are used in RGB format.
+    </p>
+    <p>
+        At the second step deep facial features are extracted from every detected facial region. We have previously
+        proved that using a model that was pre-trained on the VGGFace2 dataset to identify the age, gender, and identity
+        of a person <a href="#16">[16]</a> and then additionally fine-tuned for emotion classification on the AffectNet dataset <a href="#17">[17]</a> works
+        better than using conventional feature extractors like VGGFace (VGG-16) or VGGFace2 (ResNet-50) <a href="#18">[18]</a>. We used
+        this methodology to train an EfficientNet-B0 model to extract 1280-dimensional feature vectors from every video
+        frame.
+    </p>
+    <p>
+        Next, we apply statistical (STAT) encoding, which is adapted from <a href="#4">[4]</a>, to aggregate features from all frames
+        that contain a face into a single video descriptor <a href="#19">[19]</a>. More specifically, we concatenate the mean, variance,
+        maximum, and minimum of the frame features for a given video and apply L2 normalization to the result. The
+        encoded features are used to train a linear Support Vector Machine (SVM) to predict one of the 7 emotion classes.
+        During training we only use those videos, where at least one frame contains a face, otherwise, the sample is
+        ignored.
+    </p>
+    <H5>B.	Sequential models</H5>
+    <p>
+        Inspired by Frame Attention Networks (FAN) <a href="#14">[14]</a>, which are designed to adaptively aggregate frame features, we
+        decided to apply this approach to the features extracted by our EfficientNet model. The pipeline consists of two
+        modules, which take a video with a variable number of frames as an input. The feature embedding module is
+        represented by our EfficientNet feature extractor, which is the same model that we use in the MobileEmotiFace
+        pipeline. As a result, each i-th frame is associated with a D-dimensional feature vector f<sub>i</sub> extracted by a CNN
+        pre-trained on facial expression recognition. Then we propose a new way of forming the training and validation
+        sets by concatenating the frame features f<sub>i</sub> with an additional vector <SPAN STYLE="text-decoration:overline">f</SPAN>,
+        which is the output of a statistical function calculated over all given frames using point-wise operations. We
+        will demonstrate in the experimental study that the maximum function boosts the performance of models the most.
+        The resulting vectors are then used by the frame attention module to learn attention weights, which are needed
+        to highlight the most significant frames and adaptively aggregate the frame features to produce a fixed-dimension
+        representation of a given video. This pipeline is studied with multiple attention kernels, including single attention,
+        relation-attention, and self-attention <a href="#13">[13]</a>.
+    </p>
+    <H4>III.	EXPERIMENTAL RESULTS</H4>
+    <p>
+        The experimental study was done on the AFEW dataset <a href="#6">[6]</a>, which is a dynamic facial expression dataset consisting
+        of short video clips with natural head pose movements, occlusions, and various illuminations collected from
+        scenes in movies. Every video clip has been labeled as one of seven emotions: anger, disgust, fear, happiness,
+        sadness, surprise, and neutral. The dataset is divided into three partitions: a training set (773), a validation
+        set (383), and a test set (653). The true labels for the test set are not available, so we report the results
+        only on the validation set.
+    </p>
+    <div style="page-break-inside: avoid;">
+        <img src="pipeline2.jpg" alt="Pipeline 1" style="width: 338px; height: auto;"/>
+        <H6>Fig. 2.	Proposed pipeline for attention-based models</H6>
+    </div>
+    <H5>A.	MobileEmotiFace</H5>
+    <p>
+        Firstly, we test two different models as feature extractors in the proposed MobileEmotiFace pipeline and compare
+        the results. The first feature extractor is a lightweight multi-output extension <a href="#16">[16]</a> of the MobileNet v1 model
+        that was pre-trained for identity prediction on the VGGFace2 dataset and further fine-tuned for emotion
+        recognition on the AffectNet dataset <a href="#17">[17]</a>. The second model was trained in the same way using the EfficientNet
+        B0 architecture <a href="#9">[9]</a>. The source code of training using both TensorFlow 2 and PyTorch 1.7 together with a demo
+        mobile application <a href="#10">[10]</a> for Android platform are publicly available
+        <a href="https://github.com/PolinaDemochkina/EmotionRecognition" target="_blank"><u>here</u></a>. As shown in Table I, the
+        EfficientNet feature extractor is much more effective than the MobileNet model in all cases.
+    </p>
+    <p>
+        In addition, we looked at two ways of creating the video descriptors: separately calculating the statistics of
+        the frames containing a face and not containing a face and then computing their weighted sum of descriptors
+        (hereinafter “All frames”) or using only the frames with faces in the aggregation process and ignoring the
+        others (hereinafter “Faces only”). We report the accuracy for both techniques. Combining the face and empty
+        frame features proved to be effective for some of the classifiers when using the MobileNet feature extractor,
+        while the EfficientNet model constantly had better results with facial features only (Table I). Therefore, for
+        the EfficientNet model, we will not be considering those frames, where a face was not detected.
+    </p>
+    <p>
+        Moreover, we looked at different classifiers to be used in the last module of the MobileEmotiFace pipeline. Our
+        previous best result <a href="#10">[10]</a> for the MobileNet feature extractor was achieved using a linear SVC, and now we have
+        discovered that the random forest classifier outperforms all the other classifiers reaching 56.4% accuracy. As
+        for the EfficientNet feature extractor, using the linear SVC led to the best recognition accuracy of 59.10%.
+    </p>
+</div>
+<div class="footer" style="page-break-after: always;">XXX-X-XXXX-XXXX-X/XX/$XX.00 ©20XX IEEE</div>
+<!--Page 3-->
+<div class="columns" style="page-break-before: always;">
+    <p>
+        Finally, we found that the AFEW dataset contains 11 training and 4 validation samples, where no faces were
+        detected in any of the frames (“empty” samples). So, we tried excluding them from the training set and this
+        boosted the performance of the SVC for the EfficientNet feature extractor even more (Table I). Note that only
+        non-empty samples are included into the validation set as well.
+    </p>
+    <p>
+        The aim of the next ablation study is to assess the importance of each statistical feature in the STAT encoding
+        module of the proposed pipeline (Table II). The validation accuracy in this experiment was calculated using only
+        those frames that had a face in them, others were ignored. Although the best result was achieved by aggregating
+        all statistical functions (minimum, maximum, mean, and standard deviation), it was discovered that mean and
+        maximum had the most impact on the accuracy. It can be seen from Table II that using these two functions in the
+        STAT encoding is only 1% less accurate than combining all functions. Therefore, it could be possible to
+        potentially lower the dimensionality of the video descriptors by using only the most significant features. In
+        addition, we examined the effect of principal component analysis (PCA) on the accuracy. In all cases PCA had
+        little or no increase in accuracy at all, so we will not be using it in the remainder of this paper. All in all,
+        we were able to improve the baseline of classifying the mean of frame features by 5.54%.
+    </p>
+    <div style="page-break-inside: avoid;">
+        <table>
+            <caption><H5>TABLE I. 	ACCURACY (%) OF DIFFERENT FEATURE EXTRACTORS AND CLASSIFIERS</H5></caption>
+            <thead>
+                <tr>
+                    <th>Feature extractor</th>
+                    <th>Classifier</th>
+                    <th>Training samples</th>
+                    <th>Faces only</th>
+                    <th>All frames</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>MobileNet</td>
+                    <td>SVC (linear)</td>
+                    <td>All</td>
+                    <td>54.05</td>
+                    <td>54.83</td>
+                </tr>
+                <tr>
+                    <td>MobileNet</td>
+                    <td>SVC (RBF)</td>
+                    <td>All</td>
+                    <td>53.53</td>
+                    <td>52.22</td>
+                </tr>
+                <tr>
+                    <td>MobileNet</td>
+                    <td>Random forest</td>
+                    <td>All</td>
+                    <td>55.15</td>
+                    <td>56.40</td>
+                </tr>
+                <tr>
+                    <td>MobileNet</td>
+                    <td>XGBoost</td>
+                    <td>All</td>
+                    <td>52.74</td>
+                    <td>52.22</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>SVC (linear)</td>
+                    <td>All</td>
+                    <td>59.10</td>
+                    <td>55.88</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>SVC (RBF)</td>
+                    <td>All</td>
+                    <td>53.83</td>
+                    <td>51.96</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>Random forest</td>
+                    <td>All</td>
+                    <td>54.09</td>
+                    <td>52.48</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>XGBoost</td>
+                    <td>All</td>
+                    <td>54.61</td>
+                    <td>53.53</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>SVC (linear)</td>
+                    <td>Non-empty</td>
+                    <td>59.89</td>
+                    <td>55.88</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>SVC (RBF)</td>
+                    <td>Non-empty</td>
+                    <td>59.10</td>
+                    <td>51.96</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>Random forest</td>
+                    <td>Non-empty</td>
+                    <td>54.09</td>
+                    <td>52.48</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>XGBoost</td>
+                    <td>Non-empty</td>
+                    <td>53.83</td>
+                    <td>53.53</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="page-break-inside: avoid;">
+        <table>
+            <caption><H5>TABLE II. 	ACCURACY (%) OF VARIOUS STAT FEATURES</H5></caption>
+            <thead>
+                <tr>
+                    <th>Feature extractor</th>
+                    <th>STAT features</th>
+                    <th>Original accuracy</th>
+                    <th>PCA</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>MobileNet</td>
+                    <td>Mean (baseline)</td>
+                    <td>52.24</td>
+                    <td>52.77</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>Mean (baseline)</td>
+                    <td>54.35</td>
+                    <td>54.61</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>Maximum</td>
+                    <td>58.58</td>
+                    <td>54.62</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>Standard deviation</td>
+                    <td>51.19</td>
+                    <td>51.96</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>Minimum</td>
+                    <td>50.92</td>
+                    <td>50.65</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>Мaximum, mean</td>
+                    <td>58.84</td>
+                    <td>55.67</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet</td>
+                    <td>All</td>
+                    <td><strong>59.89</strong></td>
+                    <td>56.20</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="page-break-inside: avoid;">
+        <table>
+            <caption><H5>TABLE III. 	ACCURACY (%) OF DIFFERENT SEQUENTIAL MODELS</H5></caption>
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>MobileNet features</th>
+                    <th>EfficientNet features</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>LSTM</td>
+                    <td>49.87</td>
+                    <td>51.45</td>
+                </tr>
+                <tr>
+                    <td>GRU</td>
+                    <td>50.92</td>
+                    <td>53.03</td>
+                </tr>
+                <tr>
+                    <td>Single-headed attention</td>
+                    <td>52.51</td>
+                    <td>53.56</td>
+                </tr>
+                <tr>
+                    <td>Relation attention </td>
+                    <td>51.98</td>
+                    <td>53.56</td>
+                </tr>
+                <tr>
+                    <td>Self-attention</td>
+                    <td>53.03</td>
+                    <td>54.88</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="page-break-inside: avoid;">
+        <table>
+            <caption><H5>TABLE IV. 	ACCURACY (%) OF DIFFERENT SEQUENTIAL MODELS WITH THE EFFIECIENTNET FEATURE EXTRACTOR</H5></caption>
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>Post-processing</th>
+                    <th>Frame-level features only</th>
+                    <th>Frame features + mean descriptor</th>
+                    <th>Frame features + maximum descriptor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>LSTM</td>
+                    <td>L2 norm</td>
+                    <td>38.78</td>
+                    <td>47.75</td>
+                    <td>49.86</td>
+                </tr>
+                <tr>
+                    <td>LSTM</td>
+                    <td>N/A</td>
+                    <td>51.45</td>
+                    <td>53.30</td>
+                    <td>55.41</td>
+                </tr>
+                <tr>
+                    <td>GRU</td>
+                    <td>L2 norm</td>
+                    <td>41.16</td>
+                    <td>44.06</td>
+                    <td>45.12</td>
+                </tr>
+                <tr>
+                    <td>GRU</td>
+                    <td>N/A</td>
+                    <td>53.03</td>
+                    <td>53.56</td>
+                    <td>55.41</td>
+                </tr>
+                <tr>
+                    <td>Single-headed attention</td>
+                    <td>L2 norm</td>
+                    <td>53.03</td>
+                    <td>53.56</td>
+                    <td>55.94</td>
+                </tr>
+                <tr>
+                    <td>Single-headed attention</td>
+                    <td>N/A</td>
+                    <td>53.56</td>
+                    <td>54.35</td>
+                    <td>56.20</td>
+                </tr>
+                <tr>
+                    <td>Relation attention</td>
+                    <td>L2 norm</td>
+                    <td>53.03</td>
+                    <td>53.83</td>
+                    <td>55.94</td>
+                </tr>
+                <tr>
+                    <td>Relation attention</td>
+                    <td>N/A</td>
+                    <td>53.56</td>
+                    <td>53.83</td>
+                    <td>57.26</td>
+                </tr>
+                <tr>
+                    <td>Self-attention</td>
+                    <td>L2 norm</td>
+                    <td>54.35</td>
+                    <td>55.41</td>
+                    <td>55.41</td>
+                </tr>
+                <tr>
+                    <td>Self-attention</td>
+                    <td>N/A</td>
+                    <td>54.88</td>
+                    <td>55.67</td>
+                    <td>55.94</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <H5>B.	Sequential models</H5>
+    <p>
+        In our study, we consider Long Short-Term Memory (LSTM) networks as the baseline. We compare the proposed
+        pipeline (Fig. 2) with various attention kernels, namely single attention, self-attention, and
+        relation-attention, to the baseline approach.
+    </p>
+    <p>
+        In the first experiment (Table III) we consider two feature extractors that we have also tested in the
+        MobileEmotiFace pipeline. For the recurrent neural network (RNN) models we randomly sample K consecutive frames
+        and for the attention models, we borrow the frame sampling technique from <a href="#14">[14]</a>. More specifically, we split the
+        video into K segments and then randomly select one frame from each segment. K is chosen between 3 and 5. From
+        our observations, the attention models work best with K=3, while for the RNN models the best value of K varies
+        in the abovementioned range. No special pre-processing is applied to the feature vectors. Here the best results
+        were obtained, when using the EfficientNet feature extractor (Table III). Moreover, we support the superiority
+        of attention-based learning over classification of mean frame <a href="#14">[14]</a>: the proposed implementation with the
+        self-attention kernel is better than the baseline of classifying mean features with an SVM for both feature extractors.
+    </p>
+</div>
+<div class="footer" style="page-break-after: always;">XXX-X-XXXX-XXXX-X/XX/$XX.00 ©20XX IEEE</div>
+<!--Page 4-->
+<div class="columns" style="page-break-before: always;">
+    <div style="page-break-inside: avoid;">
+        <table>
+            <caption><H5>TABLE V. 	ACCURACY (%) OF DIFFERENT FRAME SAMPLING METHODS</H5></caption>
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>FAN sampling</th>
+                    <th>Random sampling</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Single-headed attention</td>
+                    <td>56.20</td>
+                    <td>56.20</td>
+                </tr>
+                <tr>
+                    <td>Relation attention</td>
+                    <td>57.26</td>
+                    <td>56.73</td>
+                </tr>
+                <tr>
+                    <td>Self-attention</td>
+                    <td>55.94</td>
+                    <td>55.15</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="page-break-inside: avoid;">
+        <table>
+            <caption><H5>TABLE VI. 	PERFORMANCE OF THE C1D MODEL</H5></caption>
+            <thead>
+                <tr>
+                    <th>Features</th>
+                    <th>Accuracy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>EfficientNet, no statistical function</td>
+                    <td>51.67</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet + mean</td>
+                    <td>54.01</td>
+                </tr>
+                <tr>
+                    <td>EfficientNet + maximum</td>
+                    <td>56.47</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="page-break-inside: avoid;">
+        <table>
+            <caption><H5>TABLE VII. 	VALIDATION ACCURACY (%) OF KNOWN APPROACHES FOR THE AFEW DATASET </H5></caption>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Details</th>
+                    <th>Modality</th>
+                    <th>Accuracy</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Hu et al. <a href="#3">[3]</a></td>
+                    <td>Ensemble</td>
+                    <td>Audio, video</td>
+                    <td>59.01</td>
+                </tr>
+                <tr>
+                    <td>Kaya et al. <a href="#20">[20]</a></td>
+                    <td>Ensemble</td>
+                    <td>Audio, video</td>
+                    <td>57.02</td>
+                </tr>
+                <tr>
+                    <td>VGG13 + VGG16 + ResNet <a href="#4">[4]</a></td>
+                    <td>Ensemble</td>
+                    <td>Video</td>
+                    <td>59.42</td>
+                </tr>
+                <tr>
+                    <td>Four face recognition networks <a href="#21">[21]</a></td>
+                    <td>Ensemble</td>
+                    <td>Video</td>
+                    <td>55.17</td>
+                </tr>
+                <tr>
+                    <td>Noisy student with iterative training <a href="#22">[22]</a></td>
+                    <td>Single model</td>
+                    <td>Video</td>
+                    <td>55.17</td>
+                </tr>
+                <tr>
+                    <td>DenseNet-161 <a href="#23">[23]</a></td>
+                    <td>Single model</td>
+                    <td>Video</td>
+                    <td>51.44</td>
+                </tr>
+                <tr>
+                    <td>FAN <a href="#14">[14]</a></td>
+                    <td>Single model</td>
+                    <td>Video</td>
+                    <td>51.18</td>
+                </tr>
+                <tr>
+                    <td>LBP-TOP (baseline) <a href="#7">[7]</a></td>
+                    <td>Single model</td>
+                    <td>Video</td>
+                    <td>38.90</td>
+                </tr>
+                <tr>
+                    <td><strong>Our MobileEmotiFace with EfficientNet</strong></td>
+                    <td><strong>Single model</strong></td>
+                    <td><strong>Video</strong></td>
+                    <td><strong>59.79</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>Our attention (1), (2) with EfficientNet</strong></td>
+                    <td><strong>Single model</strong></td>
+                    <td><strong>Video</strong></td>
+                    <td><strong>57.26</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p>
+        Furthermore, we experiment with our proposed way of forming the training and validation sets for such models:
+        calculating some statistical function using all frames of the input sequence and passing the resulting vector
+        along with the sampled video frames. A comparative study showed that using the mean as the statistical function
+        in such an approach significantly improves the accuracy, when compared to the conventional approach, however,
+        calculating the maximum leads to even better performance (Table IV).
+    </p>
+    <p>
+        Additionally, we examine the effect of L2 normalization on the overall accuracy. In the case of all sequential
+        models, applying L2 normalization to the feature vectors decreases the accuracy, so we will not be using it.
+        The best result was achieved by the model with the relation-attention kernel (57.26%).
+    </p>
+    <p>
+        We also try a different approach of frame sampling. Unlike the method proposed for FAN <a href="#14">[14]</a>, where a frame was
+        chosen from each of the K segments of a fixed size, we randomly sample K indexes from the input sequence, order
+        them, and use the frames at these indexes. In both approaches, K was chosen as 3 and the proposed aggregation of
+        facial features with the maximum over all frames was used. As one can notice, this frame sampling technique did
+        not increase the recognition accuracy (Table V).
+    </p>
+    <p>
+        Finally, since Transformer models <a href="#12">[12]</a> are gaining more and more popularity, we would like to apply the same
+        idea to the emotion recognition task in the future. For now, we have established a baseline for this approach
+        using 1D convolutions (C1D model). This model could be considered as a baseline, since Transformers look at
+        embeddings globally, while 1D convolutions do the same thing locally. We try sampling K=4 video frames using the
+        technique from FAN <a href="#14">[14]</a> and using our proposed method (additionally passing the output of a statistical function
+        to the network). Our approach with feature aggregation improves the accuracy of the conventional method by
+        almost 5%. Moreover, we discover that calculating the maximum leads to better results than other statistical
+        functions (Table VII).
+    </p>
+    <H5>C.	Comparison to other known approaches</H5>
+    <p>
+        We compare our best results for both approaches to several state-of-the-art emotion recognition methods on the
+        AFEW dataset (Table VI). For this comparative experiment, the accuracy of our methods was calculated using all
+        frames, including the ones, where no faces were found by the MTCNN detector. Our new feature extractor in
+        combination with the MobileEmotiFace pipeline achieves state-of-the-art results on the AFEW 8.0 dataset (59.79%),
+        beating the baseline in the Audio-Video emotion recognition sub-challenge from EmotiW 2019 by 20.89%. Furthermore,
+        we were able to improve the FAN approach <a href="#14">[14]</a> by 6.08% by using our EfficientNet extractor and additionally
+        feeding the maximum over all frames.
+    </p>
+    <H4>CONCLUSION</H4>
+    <p>
+        In this paper, we proposed a novel efficient approach that is a combination of the MobileEmotiFace pipeline with
+        a new EfficientNet-based feature extractor <a href="#11">[11]</a>. This approach achieved the state-of-the-art results for emotion
+        recognition on the AFEW 8.0 dataset (Table VII). Moreover, this approach is computationally efficient and can be
+        implemented on mobile devices <a href="#10">[10]</a>, <a href="#1">[1]</a>. The demo application for Android platform is made publicly available.
+        We prove that the current trend for using the attention mechanism in solutions to many machine learning problems
+        can also be successfully applied to the emotion recognition task. We also show that our new way of creating the
+        training and validation sets for sequential models, which consists of passing the output of a statistical
+        function along with the facial feature vectors to the network, significantly boosts the performance of
+        attention-based models <a href="#12">[12]</a>. Such an approach leads to improved overall accuracy for multiple models when
+        compared to the conventional technique without using any statistical function (Table IV, Table VI). In the
+        future, it is necessary to study the possibility of using Transformers to effectively solve the task of
+        automated emotion recognition.
+    </p>
+    <H4>ACKNOWLEDGMENT</H4>
+    <p>
+        The work is supported by RSF (Russian Science Foundation) grant 20–71– 10010.
+    </p>
+    <H4>REFERENCES</H4>
+    <ol>
+        <li id="1">A. S. Kharchevnikova, and A. V. Savchenko, “Video-based age and gender recognition in mobile applications,”
+            In Proceedings of the International Conference on Information Technology and Nanotechnology (ITNT). Session
+            Image Processing and Earth Remote Sensing, 2018, CEUR-WS, vol. 2210, pp. 227-235.</li>
+        <li id="2">A. S. Kharchevnikova, and A. V. Savchenko, “Visual preferences prediction for a photo gallery based on image
+            captioning methods,” Computer Optics, vol. 44, no. 4, pp.618–626, 2020.</li>
+    </ol>
+</div>
+<div class="footer" style="page-break-after: always;">XXX-X-XXXX-XXXX-X/XX/$XX.00 ©20XX IEEE</div>
+<!--Page 5-->
+<div class="columns" style="page-break-before: always;">
+    <ol start="3">
+        <li id="3">P. Hu, D. Cai, S. Wang, A. Yao, and Y. Chen, “Learning supervised scoring ensemble for emotion recognition
+            in the wild,” In Proceedings of the 19th ACM International Conference on Multimodal Interaction, 2017, pp. 553–560.</li>
+        <li id="4">S. A. Bargal, E. Barsoum, C. C. Ferrer, and C. Zhang, “Emotion recognition in the wild from videos using
+            images,” In Proceedings of the 18th ACM International Conference on Multimodal Interaction, 2016, pp. 433–436.</li>
+        <li id="5">Y. Fan, X. Lu, D. Li, and Y. Liu, “Video-based emotion recognition using CNN-RNN and C3D hybrid networks,”
+            In Proceedings of the 18th ACM International Conference on Multimodal Interaction, pp. 445–450, 2016.</li>
+        <li id="6">A. Dhall, R. Goecke, S. Lucey, and T. Gedeon, “Collecting large, richly annotated facial expression databases
+            from movies,” IEEE Annals of the History of Computing, vol. 19, no. 3, pp. 34–41, IEEE Computer Society, 2012.</li>
+        <li id="7">A. Dhall, “EmotiW 2019: Automatic emotion, engagement and cohesion prediction tasks,” In Proceedings of the
+            International Conference on Multimodal Interaction, pp. 546–550, 2019.</li>
+        <li id="8">A. V. Kuznetsov, and M. V. Gashnikov, “Remote sensing data retouching based on image inpainting algorithms
+            in the forgery generation problem,” Computer Optics, vol. 44, no. 5, pp.763–771, 2020.</li>
+        <li id="9">A. V. Savchenko, “Facial expression and attributes recognition based on multi-task learning of lightweight
+            neural networks,” arXiv preprint arXiv:2103.17107, 2021.</li>
+        <li id="10">P. Demochkina, and A. V. Savchenko, “MobileEmotiFace: efficient facial image representations in video-based
+            emotion recognition on mobile devices,” In Proceedings of ICPR International Workshops and Challenges, Part V,
+            pp. 266-274, Springer International Publishing, 2021.</li>
+        <li id="11">M. Tan, and Q. Le, “EfficientNet: Rethinking model scaling for convolutional neural networks,” In International
+            Conference on Machine Learning,  pp. 6105-6114, PMLR, 2019.</li>
+        <li id="12">A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, L. Kaiser, and I. Polosukhin.,
+            “Attention is all you need,” in Advances in neural information processing systems, pp. 5998–6008, 2017.</li>
+        <li id="13">K. V. Demochkin, and A. V. Savchenko, “Visual product recommendation using neural aggregation network and
+            context gating,” Journal of Physics: Conference Series, vol. 1368, no. 3, pp. 032016, IOP Publishing, 2019.</li>
+        <li id="14">D. Meng, X. Peng, K. Wang, and Y. Qiao, “Frame attention networks for facial expression recognition in videos,”
+            In Proceedings of the International Conference on Image Processing (ICIP), pp. 3866-3870, IEEE, 2019.</li>
+        <li id="15">K. Zhang, Z. Zhang, Z. Li, and Y. Qiao, “Joint face detection and alignment using multitask cascaded
+            convolutional networks,” IEEE Signal Processing Letters, vol. 23, no. 10, pp. 1499–1503, 2016.</li>
+        <li id="16">A. V. Savchenko, “Efficient facial representations for age, gender and identity recognition in organizing
+            photo albums using multi-output ConvNet,” PeerJ Computer Science, vol. 5, pp. e197, PeerJ Inc., 2019.</li>
+        <li id="17">Mollahosseini, Ali, B. Hasani, and M. H. Mahoor, “AffectNet: a database for facial expression, valence, and
+            arousal computing in the wild,” IEEE Transactions on Affective Computing, vol. 10, no. 1, pp. 18-31, IEEE, 2017.</li>
+        <li id="18">Q. Cao, L. Shen, W. Xie, O. M. Parkhi, and A. Zisserman, “VggFace2: A dataset for recognising faces across
+            pose and age,” In 2018 13th IEEE international conference on automatic face & gesture recognition (FG 2018),
+            pp. 67–74, IEEE, 2018.</li>
+        <li id="19">E. A. Dmitriev, and V. V. Myasnikov, “Comparative study of description algorithms for complex-valued gradient
+            fields of digital images using linear dimensionality reduction methods,” Computer Optics, vol. 42, no. 5, pp. 822–828, 2018.</li>
+        <li id="20">H. Kaya, F. Gurpınar, and A. A. Salah, “Video-based emotion recognition in the wild using deep transfer learning
+            and score fusion,” Image and Vision Computing, vol. 65, pp. 66–75, 2017.</li>
+        <li id="21">B. Knyazev, R. Shvetsov, N. Efremova, and A. Kuharenko, “Convolutional neural networks pretrained on large
+            face recognition datasets for emotion classification from video,” arXiv preprint arXiv:1711.04598, 2017.</li>
+        <li id="22">V. Kumar, S. Rao, and L. Yu, “Noisy student training using body language dataset improves facial expression
+            recognition,” In European Conference on Computer Vision, 2020, pp. 756–773, Springer.</li>
+        <li id="23">C. Liu, T. Tang, K. Lv, and M. Wang, “Multi-feature based emotion recognition for video clips,” In Proceedings
+            of the 20th ACM International Conference on Multimodal Interaction, pp. 630–634, 2018.</li>
+    </ol>
+</div>
+<div class="footer" style="page-break-after: always;">XXX-X-XXXX-XXXX-X/XX/$XX.00 ©20XX IEEE</div>
+<H1>AI quotes:</H1>
+<div style="text-align: right; font-size: 16pt">
+    <ul>
+        <li>
+            <q>Predicting the future isn't magic, it's artificial intelligence.</q><br>
+            <cite>Dave Waters</cite>
+        </li>
+        <li>
+            <q>Our intelligence is what makes us human, and AI is an extension of that quality.</q><br>
+            <cite>Yann LeCun Professor, New York University</cite>
+        </li>
+    </ul>
+</div>
+<div style="page-break-inside: avoid;">
+    <img class="frame" src="yann_lecun.jpg" alt="Yann Lecun" style="width: 338px; height: auto;"/>
+    <br><br><br>
+</div>
+<div>
+    <H1>Please leave your review:</H1>
+    <form style="font-size: 16pt">
+        <label for="name">First name:</label><br>
+        <input type="text" id="name" name="name"><br><br>
+        <label for="lastname">Last name:</label><br>
+        <input type="text" id="lastname" name="lastname"><br><br>
+        <label for="review">Your review: </label><br>
+        <input type="text" id="review" name="review"><br><br>
+        <input type="submit" style = "font-size:16pt"><br><br><br>
+    </form>
+</div>
+</body>
+</html>
